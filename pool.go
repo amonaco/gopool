@@ -14,24 +14,26 @@ type pool struct {
 	inuse     uint
 	max       uint
 	min       uint // Minimum Available
+	name      string
 	resources chan interface{}
-	create    func() interface{}
+	create    func(name string) interface{}
 	destroy   func(interface{})
 }
 
 /*
  * Creates a new resource Pool
  */
-func Initialize(name string, min uint, max uint, create func() interface{}, destroy func(interface{})) {
+func Initialize(name string, min uint, max uint, create func(name string) interface{}, destroy func(interface{})) {
 	p := new(pool)
 	p.max = max
 	p.min = min
 	p.resources = make(chan interface{}, max)
+	p.name = name
 	p.create = create
 	p.destroy = destroy
 	for i := uint(0); i < min; i++ {
 		p.count++
-		resource := p.create()
+		resource := p.create(name)
 		p.resources <- resource
 	}
 	pools[name] = p
@@ -40,7 +42,7 @@ func Initialize(name string, min uint, max uint, create func() interface{}, dest
 func (p *pool) New() {
 	p.mx.Lock()
 	p.count++
-	resource := p.create()
+	resource := p.create(p.name)
 	p.resources <- resource
 	p.mx.Unlock()
 }
@@ -60,7 +62,7 @@ Waiting:
 	if p.inuse < p.count {
 		p.inuse++
 	} else if p.count < p.max {
-		resource := p.create()
+		resource := p.create(p.name)
 		p.resources <- resource
 		p.count++
 		p.inuse++
